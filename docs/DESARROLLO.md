@@ -43,7 +43,7 @@ Las pruebas actuales cubren subida simulada, contenido transmitido, integridad, 
 
 ## Antes de publicar una actualización
 
-Actualiza la versión en package.json y package-lock.json, el User-Agent del proveedor si corresponde, y CHANGELOG.md. Ejecuta los comandos anteriores y prueba al menos un clip en la Deck. Actualiza downloads/ con el ZIP validado y cambia el enlace del README. Evita incluir node_modules, grabaciones, enlaces personales o archivos de configuración privada.
+Actualiza la versión en package.json y package-lock.json, el User-Agent del proveedor si corresponde, y CHANGELOG.md. Ejecuta los comandos anteriores y prueba al menos un clip en la Deck. Crea una versión en GitHub Releases con la etiqueta correspondiente y adjunta el ZIP validado como asset. Actualiza el enlace del README; no guardes ZIP de instalación en el árbol del repositorio. Evita incluir node_modules, grabaciones, enlaces personales o archivos de configuración privada.
 
 ## Alcance pendiente
 
