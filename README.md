@@ -8,7 +8,7 @@ No necesita una cuenta de almacenamiento, claves de API, configuración de corre
 
 ## Descargar e instalar
 
-**[Descargar DeckClip 0.6.0](downloads/DeckClip-0.6.0.zip?raw=1)**
+**[Descargar DeckClip 0.6.0](https://github.com/ryudo261276/DeckClip/releases/download/v0.6.0/DeckClip-0.6.0.zip)**
 
 1. Descarga el ZIP y cópialo a tu Steam Deck. No lo descomprimas.
 2. Con Decky Loader instalado, abre sus ajustes.
