@@ -1,0 +1,12 @@
+{
+  "name": "DeckClip",
+  "author": "DeckClip",
+  "flags": [],
+  "api_version": 1,
+  "publish": {
+    "tags": [
+      "utility"
+    ],
+    "description": "Exporta clips con Steam y comp\u00e1rtelos con QR o copiando el enlace, sin cuentas."
+  }
+}
