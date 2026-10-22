@@ -48,7 +48,7 @@ class Uploader:
             connection.putrequest(method, route)
             for name, value in {
                 'Content-Length': str(size), 'Content-Type': 'application/octet-stream',
-                'Accept': 'application/json', 'User-Agent': 'DeckClip/0.6.0',
+                'Accept': 'application/json', 'User-Agent': 'DeckClip/0.7.0',
                 **(headers or {}),
             }.items():
                 connection.putheader(name, value)

@@ -3,7 +3,7 @@ import { findModuleExport } from '@decky/ui';
 export type Clip = {clip_id: string; game_id?: string; date_recorded?: number; duration_ms?: string; name?: string; thumbnail_url?: string; game_name?: string};
 type AppStore = {GetAppOverviewByGameID(id: string): {display_name?: string} | undefined};
 type Reply = {GetEResult(): number; Body(): {toObject(): {clip?: Clip[]}; result(): number}};
-type RecordingRPC = {GetClips(req: object): Promise<Reply>; ExportClip(req: object): Promise<Reply>};
+type RecordingRPC = {GetClips(req: object): Promise<Reply>; ExportClip(req: object): Promise<Reply>; DeleteClip?(req:object):Promise<Reply>};
 function rpc(): RecordingRPC {
   const api = findModuleExport((value: RecordingRPC | undefined) =>
     typeof value?.GetClips === 'function' && typeof value?.ExportClip === 'function');
@@ -28,4 +28,11 @@ export async function exportNative(id: string, path: string): Promise<void> {
   if (response.GetEResult() !== 1) throw new Error(`Error de Steam (${response.GetEResult()}).`);
   const result = response.Body().result();
   if (result !== 1) throw new Error(`El exportador de Steam devolvió el código ${result}.`);
+}
+
+export async function deleteClip(id:string):Promise<void> {
+  const api = rpc();
+  if (!api.DeleteClip) throw new Error('Steam no expone la función para borrar clips en esta versión.');
+  const response = await api.DeleteClip({clip_id:id});
+  if(response.GetEResult() !== 1) throw new Error(`Steam no pudo borrar el clip (${response.GetEResult()}).`);
 }

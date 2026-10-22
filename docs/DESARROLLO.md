@@ -20,6 +20,14 @@
 
 Las respuestas del proveedor y las excepciones de red se convierten en mensajes acotados. No se muestran cuerpos completos de errores ni se registran vídeos. El QR no consulta una API externa.
 
+## Gestión y actualizaciones (0.7.0)
+
+El borrado original usa GameRecording.DeleteClip y comprueba EResult. La UI solicita confirmación antes de invocarlo. Para MP4, el backend restringe el nombre a un archivo regular directo de Videos/DeckClip, rechaza enlaces simbólicos y bloquea cambios durante una subida.
+
+updates.py consulta /repos/ryudo261276/DeckClip/releases/latest, compara versiones numéricamente y acepta solo el ZIP esperado con SHA256. src/updater.ts solicita la instalación usando window.DeckyBackend.call('utilities/install_plugin', url, 'DeckClip', version, hash, 2). En el código oficial de Decky esta ruta abre la confirmación y valida el hash antes de instalar. La API puede cambiar entre versiones de Decky; se informa si no está disponible.
+
+Fuentes de compatibilidad: https://github.com/SteamDeckHomebrew/decky-loader/blob/main/frontend/src/plugin.ts y https://github.com/SteamDeckHomebrew/decky-loader/blob/main/backend/decky_loader/browser.py
+
 ## Dependencias de ejecución
 
 El frontend compila mediante TypeScript y Rollup con las bibliotecas de Decky. El backend utiliza la biblioteca estándar de Python. No hay cuentas de servicio ni base de datos.

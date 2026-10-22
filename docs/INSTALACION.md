@@ -29,3 +29,7 @@ Instala el nuevo ZIP con el mismo procedimiento. El nombre del plugin sigue sien
 Desinstala DeckClip desde Decky. Los MP4 exportados de /home/deck/Videos/DeckClip/ no se eliminan automáticamente. Puedes gestionarlos desde el modo Escritorio. Los clips originales de Steam se conservan.
 
 Desinstalar el plugin no borra las transferencias de Filebin: siguen las reglas de caducidad de ese servicio.
+
+## Desde la versión 0.7.0
+
+La 0.6.0 no tenía comprobador de actualizaciones: hay que instalar manualmente el ZIP 0.7.0 una vez. Después podrás usar Buscar actualizaciones desde el panel. Las nuevas versiones se instalan mediante el instalador y la confirmación de Decky. Las versiones anteriores se conservan en Releases.

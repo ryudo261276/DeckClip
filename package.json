@@ -1,12 +1,12 @@
 {
   "name": "deckclip",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Comparte clips de Steam por Filebin, QR y portapapeles, sin cuentas",
   "type": "module",
   "scripts": {
     "build": "rollup -c",
     "check": "tsc --noEmit",
-    "test": "node --test tests/share.test.cjs tests/native.test.cjs"
+    "test": "node --test tests/share.test.cjs tests/native.test.cjs tests/updater.test.cjs"
   },
   "keywords": [
     "decky",

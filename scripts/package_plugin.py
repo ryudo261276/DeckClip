@@ -12,13 +12,13 @@ def package():
     manifest = json.loads((ROOT / 'plugin.json').read_text(encoding='utf-8-sig'))
     if manifest['name'] != 'DeckClip':
         raise ValueError('Unexpected plugin identity')
-    required = ['plugin.json', 'package.json', 'main.py', 'providers.py', 'dist/index.js',
+    required = ['plugin.json', 'package.json', 'main.py', 'providers.py', 'updates.py', 'dist/index.js',
                 'LICENSE', 'THIRD_PARTY_NOTICES.txt', 'README.md', 'CHANGELOG.md']
     files = required + [p.relative_to(ROOT).as_posix() for p in sorted((ROOT / 'docs').glob('*.md'))]
     for name in required:
         if not (ROOT / name).is_file():
             raise FileNotFoundError(f'Missing {name}. Run npm run build first.')
-    for name in ['main.py', 'providers.py']:
+    for name in ['main.py', 'providers.py', 'updates.py']:
         ast.parse((ROOT / name).read_text(encoding='utf-8-sig'))
     destination = ROOT / 'out' / f'DeckClip-{version}.zip'
     destination.parent.mkdir(parents=True, exist_ok=True)

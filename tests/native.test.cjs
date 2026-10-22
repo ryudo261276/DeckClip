@@ -4,8 +4,8 @@ const fs=require('node:fs');
 const path=require('node:path');
 const Module=require('node:module');
 const ts=require('typescript');
-function load(clips,store){
-  const api={GetClips:async()=>({GetEResult:()=>1,Body:()=>({toObject:()=>({clip:clips})})}),ExportClip(){}};
+function load(clips,store,remove){
+  const api={GetClips:async()=>({GetEResult:()=>1,Body:()=>({toObject:()=>({clip:clips})})}),ExportClip(){},DeleteClip:remove};
   const filename=path.resolve(__dirname,'../src/native.ts');
   const compiled=new Module(filename,module);compiled.filename=filename;compiled.paths=module.paths;
   compiled.require=name=>name==='@decky/ui'?{findModuleExport:filter=>[api,store].find(filter)}:require(name);
@@ -23,4 +23,14 @@ test('missing Steam app store preserves selectable clips and game ID',async()=>{
 test('broken name lookup does not block clip selection',async()=>{
   const rows=await load([{clip_id:'one'}],{GetAppOverviewByGameID:()=>{throw Error('changed API');}}).clips();
   assert.equal(rows[0].game_name,'Juego desconocido');
+});
+
+test('delete clip sends only the selected Steam ID',async()=>{
+  let request;
+  const api=load([],undefined,async args=>{request=args;return {GetEResult:()=>1};});
+  await api.deleteClip('clip-123');assert.deepEqual(request,{clip_id:'clip-123'});
+});
+test('Steam delete error is reported',async()=>{
+  const api=load([],undefined,async()=>({GetEResult:()=>2}));
+  await assert.rejects(api.deleteClip('clip-123'),/borrar/);
 });

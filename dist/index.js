@@ -114,6 +114,14 @@ async function exportNative(id, path) {
     if (result !== 1)
         throw new Error(`El exportador de Steam devolvió el código ${result}.`);
 }
+async function deleteClip(id) {
+    const api = rpc();
+    if (!api.DeleteClip)
+        throw new Error('Steam no expone la función para borrar clips en esta versión.');
+    const response = await api.DeleteClip({ clip_id: id });
+    if (response.GetEResult() !== 1)
+        throw new Error(`Steam no pudo borrar el clip (${response.GetEResult()}).`);
+}
 
 var browser = {};
 
@@ -3013,11 +3021,32 @@ async function copyLink(url) {
     }
 }
 
+async function requestInstall(update) {
+    const expected = `https://github.com/ryudo261276/DeckClip/releases/download/v${update.version}/DeckClip-${update.version}.zip`;
+    if (!update.available || !update.installable || update.url !== expected || !/^[a-f0-9]{64}$/.test(update.sha256 ?? '')) {
+        throw new Error('El instalador de actualización no es válido.');
+    }
+    const backend = window.DeckyBackend;
+    if (!backend?.call)
+        throw new Error('Esta versión de Decky no expone su instalador. Actualiza Decky o instala el ZIP manualmente.');
+    // Official Decky route. UPDATE=2 opens Decky's own confirmation and checks SHA256.
+    await backend.call('utilities/install_plugin', update.url, 'DeckClip', update.version, update.sha256, 2);
+}
+
 const prepare = callable('prepare_native_export');
 const upload = callable('start_upload');
 const getStatus = callable('upload_status');
 const retry = callable('retry_upload');
 const cancel = callable('cancel_upload');
+const listExports = callable('list_exports');
+const deleteExport = callable('delete_export');
+const shareExport = callable('share_export');
+const checkUpdates = callable('check_updates');
+const prepareUpdate = callable('prepare_update');
+const sizeLabel = (n) => `${(n / 1048576).toFixed(1)} MB`;
+function confirmDelete(title, description, action) {
+    const modal = DFL.showModal(SP_JSX.jsx(DFL.ConfirmModal, { strTitle: title, strDescription: description, strOKButtonText: "Borrar definitivamente", strCancelButtonText: "Cancelar", bDestructiveWarning: true, onOK: () => { modal.Close(); void action(); }, onCancel: () => modal.Close() }));
+}
 function ClipCard({ item, selected, disabled, onSelect }) {
     const [failed, setFailed] = SP_REACT.useState(false);
     const seconds = Math.floor(Number(item.duration_ms ?? 0) / 1000);
@@ -3030,6 +3059,14 @@ function Content() {
     const [rows, setRows] = SP_REACT.useState([]);
     const [clip, setClip] = SP_REACT.useState('');
     const [page, setPage] = SP_REACT.useState(0);
+    const [query, setQuery] = SP_REACT.useState('');
+    const [exported, setExported] = SP_REACT.useState({ files: [], total_size: 0, free_space: 0 });
+    const [showExports, setShowExports] = SP_REACT.useState(false);
+    const [exportPage, setExportPage] = SP_REACT.useState(0);
+    const [selectedExport, setSelectedExport] = SP_REACT.useState('');
+    const [update, setUpdate] = SP_REACT.useState();
+    const [updateMessage, setUpdateMessage] = SP_REACT.useState('');
+    const [checking, setChecking] = SP_REACT.useState(false);
     const [busy, setBusy] = SP_REACT.useState(false);
     const [job, setJob] = SP_REACT.useState();
     const [message, setMessage] = SP_REACT.useState('');
@@ -3051,7 +3088,42 @@ function Content() {
             setBusy(false);
         }
     };
+    const refreshExports = async () => {
+        const result = await listExports();
+        setExported(result);
+        setExportPage(0);
+        setSelectedExport(result.files[0]?.name ?? '');
+    };
+    const inspectUpdates = async (force) => {
+        setChecking(true);
+        try {
+            const result = await checkUpdates(force);
+            setUpdate(result);
+            setUpdateMessage(result.message ?? (result.available ? 'Hay una nueva versión disponible.' : 'Tienes la última versión estable.'));
+        }
+        catch (e) {
+            setUpdateMessage(String(e));
+        }
+        finally {
+            setChecking(false);
+        }
+    };
+    const perform = async (action) => {
+        setBusy(true);
+        setMessage('');
+        try {
+            await action();
+        }
+        catch (e) {
+            setMessage(String(e));
+        }
+        finally {
+            setBusy(false);
+        }
+    };
     SP_REACT.useEffect(() => {
+        void inspectUpdates(false);
+        void refreshExports().catch(e => setMessage(String(e)));
         void refresh();
         let alive = true;
         let pending = false;
@@ -3087,12 +3159,20 @@ function Content() {
                 setShareMessage('No se pudo generar el QR. Puedes copiar el enlace.'); });
         return () => { alive = false; };
     }, [job?.url]);
-    const pages = Math.max(1, Math.ceil(rows.length / 3));
-    const visible = rows.slice(page * 3, page * 3 + 3);
+    const filtered = rows.filter(r => `${r.game_name ?? ''} ${r.name ?? ''} ${r.clip_id}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
+    const pages = Math.max(1, Math.ceil(filtered.length / 3));
+    const visible = filtered.slice(page * 3, page * 3 + 3);
+    const exportPages = Math.max(1, Math.ceil(exported.files.length / 3));
+    const exportVisible = exported.files.slice(exportPage * 3, exportPage * 3 + 3);
+    const selectedClip = rows.find(r => r.clip_id === clip);
     const locked = busy || job?.status === 'uploading';
     const expires = job?.expires ? new Date(job.expires) : undefined;
     const expiryText = expires && !Number.isNaN(expires.getTime()) ? expires.toLocaleString() : job?.expires;
-    return SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsxs(DFL.PanelSection, { title: "Compartir clip \u00B7 sin cuentas", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { children: "Elige un clip. Steam lo exporta a MP4 y DeckClip lo sube a Filebin. Despu\u00E9s escanea el QR o copia el enlace." }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", disabled: locked, onClick: () => void refresh(), children: "Actualizar clips" }) }), !rows.length && !busy && SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { children: "No hay clips guardados. Guarda primero un clip desde Medios de Steam." }) }), visible.map(item => SP_JSX.jsx(ClipCard, { item: item, selected: item.clip_id === clip, disabled: locked, onSelect: () => setClip(item.clip_id) }, item.clip_id)), pages > 1 && SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: 'flex', gap: 6, alignItems: 'center', width: '100%' }, children: [SP_JSX.jsx(DFL.Button, { disabled: locked || page === 0, onClick: () => setPage(page - 1), style: { flex: 1, minWidth: 0, padding: 6 }, children: "Anterior" }), SP_JSX.jsxs("span", { style: { fontSize: 11, whiteSpace: 'nowrap' }, children: [page + 1, "/", pages] }), SP_JSX.jsx(DFL.Button, { disabled: locked || page + 1 >= pages, onClick: () => setPage(page + 1), style: { flex: 1, minWidth: 0, padding: 6 }, children: "Siguiente" })] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", disabled: locked || !clip, onClick: async () => {
+    return SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsxs(DFL.PanelSection, { title: "Compartir clip \u00B7 sin cuentas", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { children: "Elige un clip. Steam lo exporta a MP4 y DeckClip lo sube a Filebin. Despu\u00E9s escanea el QR o copia el enlace." }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", disabled: locked, onClick: () => void refresh(), children: "Actualizar clips" }) }), !rows.length && !busy && SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { children: "No hay clips guardados. Guarda primero un clip desde Medios de Steam." }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.TextField, { label: "Buscar juego o clip", value: query, disabled: locked, onChange: e => { setQuery(e.target.value); setPage(0); } }) }), visible.map(item => SP_JSX.jsx(ClipCard, { item: item, selected: item.clip_id === clip, disabled: locked, onSelect: () => setClip(item.clip_id) }, item.clip_id)), pages > 1 && SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: 'flex', gap: 6, alignItems: 'center', width: '100%' }, children: [SP_JSX.jsx(DFL.Button, { disabled: locked || page === 0, onClick: () => setPage(page - 1), style: { flex: 1, minWidth: 0, padding: 6 }, children: "Anterior" }), SP_JSX.jsxs("span", { style: { fontSize: 11, whiteSpace: 'nowrap' }, children: [page + 1, "/", pages] }), SP_JSX.jsx(DFL.Button, { disabled: locked || page + 1 >= pages, onClick: () => setPage(page + 1), style: { flex: 1, minWidth: 0, padding: 6 }, children: "Siguiente" })] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", disabled: locked || !selectedClip, onClick: () => {
+                                if (!selectedClip)
+                                    return;
+                                confirmDelete('Borrar clip de Steam', `Se borrará el clip original de ${selectedClip.game_name}: ${selectedClip.name || selectedClip.clip_id}. No borra MP4 exportados ni enlaces de Filebin.`, () => perform(async () => { await deleteClip(selectedClip.clip_id); await refresh(); setMessage('Clip borrado de Steam.'); }));
+                            }, children: "Borrar clip seleccionado" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", disabled: locked || !clip, onClick: async () => {
                                 setBusy(true);
                                 setMessage('Steam está exportando el clip…');
                                 try {
@@ -3101,6 +3181,7 @@ function Content() {
                                     setMessage('MP4 listo. Iniciando subida…');
                                     await upload(path);
                                     setJob(await getStatus());
+                                    await refreshExports();
                                     setMessage('');
                                 }
                                 catch (e) {
@@ -3109,7 +3190,14 @@ function Content() {
                                 finally {
                                     setBusy(false);
                                 }
-                            }, children: "Subir y obtener enlace" }) }), message && SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { role: "status", children: message }) }), busy && SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("progress", { "aria-label": "Preparando clip", style: { width: '100%', height: 12 } }) })] }), job && job.status !== 'idle' && SP_JSX.jsxs(DFL.PanelSection, { title: job.url ? 'Abre el vídeo en tu móvil' : 'Estado', children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { role: "status", children: [job.message, job.status === 'uploading' ? ` ${Math.floor(job.progress * 100)}%` : ''] }) }), job.status === 'uploading' && SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("progress", { "aria-label": "Progreso de subida", max: 1, value: job.progress, style: { width: '100%', height: 14 } }) }), job.can_retry && SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", disabled: locked, onClick: async () => {
+                            }, children: "Subir y obtener enlace" }) }), message && SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { role: "status", children: message }) }), busy && SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("progress", { "aria-label": "Preparando clip", style: { width: '100%', height: 12 } }) })] }), SP_JSX.jsxs(DFL.PanelSection, { title: "MP4 exportados", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", disabled: locked, onClick: () => {
+                                setShowExports(!showExports);
+                                void refreshExports().catch(e => setMessage(String(e)));
+                            }, children: showExports ? 'Ocultar MP4' : `Ver MP4 (${exported.files.length})` }) }), showExports && SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { fontSize: 11 }, children: ["Exportados: ", sizeLabel(exported.total_size), " \u00B7 Libre: ", (exported.free_space / 1073741824).toFixed(1), " GB"] }) }), exportVisible.map(file => SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.Button, { disabled: locked, onClick: () => setSelectedExport(file.name), style: { width: '100%', minWidth: 0, padding: 8, textAlign: 'left' }, children: [SP_JSX.jsxs("div", { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11 }, children: [selectedExport === file.name ? '✓ ' : '', file.name] }), SP_JSX.jsxs("div", { style: { fontSize: 10 }, children: [sizeLabel(file.size), " \u00B7 ", new Date(file.modified * 1000).toLocaleDateString()] })] }) }, file.name)), exportPages > 1 && SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: 'flex', gap: 6, width: '100%', alignItems: 'center' }, children: [SP_JSX.jsx(DFL.Button, { disabled: locked || exportPage === 0, onClick: () => setExportPage(exportPage - 1), style: { flex: 1, minWidth: 0 }, children: "Anterior" }), SP_JSX.jsxs("span", { children: [exportPage + 1, "/", exportPages] }), SP_JSX.jsx(DFL.Button, { disabled: locked || exportPage + 1 >= exportPages, onClick: () => setExportPage(exportPage + 1), style: { flex: 1, minWidth: 0 }, children: "Siguiente" })] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", disabled: locked || !selectedExport, onClick: () => void perform(async () => { await shareExport(selectedExport); setJob(await getStatus()); }), children: "Subir MP4 sin convertir" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", disabled: locked || !selectedExport, onClick: () => confirmDelete('Borrar MP4 exportado', `Se borrará definitivamente ${selectedExport} de Videos/DeckClip. El clip de Steam y los enlaces subidos se conservan.`, () => perform(async () => { await deleteExport(selectedExport); await refreshExports(); setMessage('MP4 borrado.'); })), children: "Borrar MP4 seleccionado" }) })] })] }), SP_JSX.jsxs(DFL.PanelSection, { title: `DeckClip ${update?.current ?? '0.7.0'} · actualizaciones`, children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", disabled: locked || checking, onClick: () => void inspectUpdates(true), children: checking ? 'Buscando versión…' : 'Buscar actualizaciones' }) }), updateMessage && SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: 11 }, children: updateMessage }) }), update?.available && SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { children: ["Nueva versi\u00F3n: ", update.version] }) }), update.notes && SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { fontSize: 11, maxHeight: 120, overflowY: 'auto', whiteSpace: 'pre-wrap' }, children: update.notes }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.ButtonItem, { layout: "below", disabled: locked || !update.installable, onClick: () => void perform(async () => {
+                                        const candidate = await prepareUpdate();
+                                        await requestInstall(candidate);
+                                        setMessage('Confirma la actualización en el instalador de Decky. El plugin se recargará.');
+                                    }), children: ["Actualizar a ", update.version] }) })] })] }), job && job.status !== 'idle' && SP_JSX.jsxs(DFL.PanelSection, { title: job.url ? 'Abre el vídeo en tu móvil' : 'Estado', children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { role: "status", children: [job.message, job.status === 'uploading' ? ` ${Math.floor(job.progress * 100)}%` : ''] }) }), job.status === 'uploading' && SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("progress", { "aria-label": "Progreso de subida", max: 1, value: job.progress, style: { width: '100%', height: 14 } }) }), job.can_retry && SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "below", disabled: locked, onClick: async () => {
                                 try {
                                     await retry();
                                     setJob(await getStatus());

@@ -51,3 +51,15 @@ El estado es temporal y se pierde al reiniciar o actualizar Decky. La caducidad 
 ## Datos útiles para informar de un fallo
 
 Indica versión de DeckClip, SteamOS, Steam y Decky; fase donde falla; mensaje exacto; duración y tamaño aproximado del clip. No publiques grabaciones ni enlaces privados salvo que quieras compartirlos.
+
+## Borrado y MP4 exportados
+
+Borrar clip seleccionado afecta al clip original gestionado por Steam. Borrar MP4 seleccionado afecta solo al archivo exportado de Videos/DeckClip. Las confirmaciones distinguen ambas operaciones. Ninguna borra la transferencia ya subida a Filebin. El backend rechaza rutas externas, enlaces simbólicos y borrado de MP4 durante una subida.
+
+## No se puede actualizar
+
+La búsqueda necesita acceso a api.github.com. GitHub limita las consultas sin autenticar: se mantiene una caché de 15 minutos para las comprobaciones al abrir el panel. Buscar actualizaciones fuerza una consulta nueva. No se requiere cuenta ni token.
+
+Solo se ofrecen versiones estables posteriores con un ZIP de nombre DeckClip-<versión>.zip y una huella SHA256 válida. Si falta el asset, no se permite instalar todavía. Si tu Decky no expone utilities/install_plugin, actualiza Decky o instala el ZIP manualmente. No se sobrescriben archivos de Decky desde el backend del plugin.
+
+Si tienes 0.6.0, no verás el botón: instala 0.7.0 manualmente la primera vez.

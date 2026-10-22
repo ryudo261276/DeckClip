@@ -1,5 +1,18 @@
 # Historial de cambios
 
+## 0.7.0 — 22 de octubre de 2026
+
+- Borrar el clip seleccionado a través de Steam, con confirmación.
+- Gestionar y borrar MP4 exportados dentro de Videos/DeckClip, con confirmación y rutas restringidas.
+- Subir MP4 existentes sin repetir la exportación, también después de reiniciar.
+- Mostrar tamaño de los MP4 y espacio libre.
+- Buscar por nombre del juego o clip en la galería.
+- Consultar nuevas versiones estables de este repositorio y mostrar las notas de versión.
+- Actualizar desde el plugin usando el instalador de Decky y comprobación SHA256, sin root adicional ni escritura manual de los archivos del plugin.
+- 37 pruebas automatizadas; consulta real de GitHub verificada. Pruebas en dispositivo pendientes para estas funciones nuevas.
+- La release 0.6.0 se conserva sin cambios.
+
+
 ## 0.6.0
 
 - Galería compacta de tres clips por página, con miniaturas de 72 × 42 y nombre en una línea.
